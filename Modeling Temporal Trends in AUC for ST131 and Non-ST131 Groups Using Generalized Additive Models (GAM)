@@ -1,0 +1,52 @@
+library(ggplot2)
+library(mgcv)
+library(dplyr)
+library(gridExtra)
+library(readr)
+
+#### Read in data
+data <- read_csv("growth_metrics.csv")
+
+#### Separate data into ST131 and Non-ST131 groups
+group1 <- data %>% filter(ST == "131")
+group2 <- data %>% filter(ST == "Non-131")
+
+#### GAM model for ST131
+gam_model1 <- gam(AUC ~ s(Year), data = group1)
+summary(gam_model1)
+
+#### GAM model for Non-ST131
+gam_model2 <- gam(AUC ~ s(Year), data = group2)
+summary(gam_model2)
+
+#### Generate yearly datasets for predictions
+new_data_1 <- data.frame(Year = seq(min(group1$Year), max(group1$Year), length.out = 10))
+predictions_1 <- predict(gam_model1, newdata = new_data_1, type = "response", se.fit = TRUE)
+
+new_data_2 <- data.frame(Year = seq(min(group2$Year), max(group2$Year), length.out = 10))
+predictions_2 <- predict(gam_model2, newdata = new_data_2, type = "response", se.fit = TRUE)
+
+#### GAM Plot for ST131
+plot1 <- ggplot() + 
+  geom_point(data = group1, aes(x = Year, y = AUC)) + 
+  geom_line(data = data.frame(Year = new_data_1$Year, AUC = predictions_1$fit), aes(x = Year, y = AUC), color = "blue", size = 1) + 
+  geom_ribbon(data = data.frame(Year = new_data_1$Year, fit = predictions_1$fit, se = predictions_1$se.fit), aes(x = Year, ymin = fit - 1.96 * se, ymax = fit + 1.96 * se), alpha = 0.3) + 
+  labs(title = "Generalized Additive Model (GAM) Fit for AUC vs. Year in ST131", x = "Collection Year", y = "AUC") + 
+  scale_x_continuous(n.breaks = 10) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#### GAM Plot for Non-ST131
+plot2 <- ggplot() + 
+  geom_point(data = group2, aes(x = Year, y = AUC)) + 
+  geom_line(data = data.frame(Year = new_data_2$Year, AUC = predictions_2$fit), aes(x = Year, y = AUC), color = "blue", size = 1) + 
+  geom_ribbon(data = data.frame(Year = new_data_2$Year, fit = predictions_2$fit, se = predictions_2$se.fit), aes(x = Year, ymin = fit - 1.96 * se, ymax = fit + 1.96 * se), alpha = 0.3) + 
+  labs(title = "Generalized Additive Model (GAM) Fit for AUC vs. Year in Non-ST131", x = "Collection Year", y = "AUC") + 
+  scale_x_continuous(n.breaks = 10) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#### Plot plot1 and plot2 side by side
+grid.arrange(plot1, plot2, ncol = 2)
+
+#### GAM Model summary for ST131
+summary(gam_model1)
+
+#### GAM Model summary for Non-ST131
+summary(gam_model2)
