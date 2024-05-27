@@ -1,0 +1,91 @@
+# Load necessary libraries
+library(tidyverse)
+library(ggplot2)
+library(dendextend)
+
+# Load the data
+data <- read.csv('metadata.csv')
+
+# Inspect the data
+head(data)
+str(data)
+
+# Create a distance matrix
+num_isolates <- nrow(data)
+distance_matrix <- matrix(NA, nrow = num_isolates, ncol = num_isolates)
+
+# Populate the distance matrix with SNP distances
+for (i in 1:num_isolates) {
+  for (j in (i + 1):num_isolates) {
+    distance_matrix[i, j] <- abs(data$SNP_Distance[i] - data$SNP_Distance[j])
+    distance_matrix[j, i] <- distance_matrix[i, j]
+  }
+}
+
+# Convert the distance matrix to a dist object
+dist_obj <- as.dist(distance_matrix)
+
+# Perform hierarchical clustering
+hc <- hclust(dist_obj, method = "single")
+
+# Plot the dendrogram
+plot(hc, labels = data$IsolateID, main = "Hierarchical Clustering Dendrogram", xlab = "Isolate Index", ylab = "Distance")
+
+# Extract dendrogram data for custom plotting
+dendro <- as.dendrogram(hc)
+dendro_data <- dendro_data(dendro)
+
+# Function to get the x, y coordinates of each leaf
+get_leaves_coords <- function(dendro_data) {
+  coords <- as.data.frame(dendro_data$segments[dendro_data$segments$yend == 0, c("x", "y")])
+  coords$label <- dendro_data$labels$label
+  return(coords)
+}
+
+coords <- get_leaves_coords(dendro_data)
+
+# Merge the coordinates with the original data to get the year information
+coords <- merge(coords, data, by.x = "label", by.y = "IsolateID")
+
+# Define colors for each year
+year_colors <- rainbow(length(unique(coords$Year)))
+
+# Plot the dendrogram using ggplot2
+ggplot() +
+  geom_segment(data = segment(dendro_data), aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_text(data = label(dendro_data), aes(x = x, y = y, label = label), size = 3, hjust = 1, angle = 90) +
+  geom_point(data = coords, aes(x = x, y = 0, color = as.factor(Year), shape = as.factor(Year)), size = 3) +
+  scale_color_manual(values = year_colors) +
+  scale_shape_manual(values = 1:length(unique(coords$Year))) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        panel.grid = element_blank()) +
+  labs(title = "Hierarchical Clustering Dendrogram", 
+       x = "Isolate Index", 
+       y = "Distance", 
+       color = "Year", 
+       shape = "Year")
+
+# Calculate and plot yearly average SNP distances
+yearly_avg_distance <- data %>%
+  group_by(Year) %>%
+  summarise(Average_SNP_Distance = mean(SNP_Distance))
+
+ggplot(yearly_avg_distance, aes(x = Year, y = Average_SNP_Distance)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Average SNP Distance Over Time", x = "Year", y = "Average SNP Distance") +
+  theme_minimal()
+
+# Cut the dendrogram to define clusters at a specific height threshold
+height_threshold <- 5 # Define your threshold here
+cut_tree <- cutree(hc, h = height_threshold)
+
+# Count and print the number of clusters
+num_clusters <- max(cut_tree)
+print(paste("Number of clusters:", num_clusters))
+
+# Optional: Highlight clusters in the dendrogram
+dendro_colored <- color_branches(dendro, k = num_clusters)
+plot(dendro_colored, main = "Hierarchical Clustering Dendrogram with Clusters")
