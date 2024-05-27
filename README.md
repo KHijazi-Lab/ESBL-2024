@@ -25,7 +25,3 @@ The scripts utilize the following R packages:
 - Additional packages as mentioned in the individual scripts.
 
 Ensure these packages are installed before running the scripts.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
