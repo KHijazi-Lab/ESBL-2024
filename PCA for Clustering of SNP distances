@@ -1,0 +1,364 @@
+# Install and load required packages
+install.packages("cluster")
+install.packages("ggplot2")
+install.packages("factoextra")
+
+library(cluster)
+library(ggplot2)
+library(factoextra)
+
+# Load metadata
+metadata <- read.csv("metadata.csv")
+
+# Load SNP distance matrix
+snp_matrix <- read.csv("snp_distance_ST131.csv", row.names = 1)
+
+# Check the structure of the data
+str(metadata)
+str(snp_matrix)
+
+# Ensure the SNP distance matrix is numeric
+snp_matrix <- as.matrix(snp_matrix)
+snp_matrix <- apply(snp_matrix, 2, as.numeric)
+
+# Perform PCA
+pca_result <- prcomp(snp_matrix, scale. = TRUE)
+pca_data <- data.frame(pca_result$x[, 1:2])  # Using first two principal components
+
+# Add IsolateID to PCA data
+pca_data$IsolateID <- rownames(pca_data)
+
+# Merge PCA data with metadata
+merged_data <- merge(pca_data, metadata, by = "IsolateID")
+
+# K-means clustering
+set.seed(123)  # Set seed for reproducibility
+kmeans_result <- kmeans(pca_data[, 1:2], centers = 3)  # Adjust number of clusters as needed
+merged_data$cluster <- as.factor(kmeans_result$cluster)
+
+# Visualization
+ggplot(merged_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-means Clustering with PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+
+# Plot with year of collection
+ggplot(merged_data, aes(x = PC1, y = PC2, color = as.factor(Year))) +
+  geom_point(size = 3) +
+  labs(title = "PCA with Year of Collection",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  scale_color_viridis_d() +
+  theme_minimal()
+
+
+# Check the number of rows in PCA data
+nrow(pca_data)
+
+# Check the number of rows in metadata
+nrow(metadata)
+
+# Check for unique IsolateIDs in both datasets
+length(unique(pca_data$IsolateID))
+length(unique(metadata$IsolateID))
+
+
+# Inspect first few rows of PCA data
+head(pca_data)
+
+# Inspect first few rows of metadata
+head(metadata)
+
+# Add IsolateID to PCA data (ensure it's character type for matching)
+pca_data$IsolateID <- as.character(rownames(pca_data))
+
+# Ensure IsolateID in metadata is also character type
+metadata$IsolateID <- as.character(metadata$IsolateID)
+
+# Merge PCA data with metadata
+merged_data <- merge(pca_data, metadata, by = "IsolateID")
+
+# Check the number of rows in merged_data
+nrow(merged_data)
+
+
+# Perform K-means clustering on PCA data
+set.seed(123)  # Set seed for reproducibility
+kmeans_result <- kmeans(pca_data[, 1:2], centers = 3)  # Adjust number of clusters as needed
+
+# Ensure that the clustering results match the number of rows in merged_data
+if (nrow(merged_data) == length(kmeans_result$cluster)) {
+  merged_data$cluster <- as.factor(kmeans_result$cluster)
+} else {
+  stop("Mismatch between the number of rows in merged_data and clustering results")
+}
+
+# Visualization
+library(ggplot2)
+
+ggplot(merged_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-means Clustering with PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+
+# Plot with year of collection
+ggplot(merged_data, aes(x = PC1, y = PC2, color = as.factor(Year))) +
+  geom_point(size = 3) +
+  labs(title = "PCA with Year of Collection",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  scale_color_viridis_d() +
+  theme_minimal()
+
+
+# Check the unique values of IsolateID in each data frame
+unique(pca_data$IsolateID)
+unique(metadata$IsolateID)
+
+# Debug the merging process
+merged_data <- merge(pca_data, metadata, by = "IsolateID", all = TRUE)
+
+# Check the number of rows in merged_data
+nrow(merged_data)
+
+# Check for NAs or missing values in merged_data
+sum(is.na(merged_data))
+
+# If there are NAs, investigate further to understand why they occurred
+which(is.na(merged_data$IsolateID))
+
+# Remove NAs and retry merging
+merged_data <- merged_data[complete.cases(merged_data), ]
+
+# Check the number of rows in merged_data again
+nrow(merged_data)
+
+# Perform K-means clustering on PCA data
+set.seed(123)  # Set seed for reproducibility
+kmeans_result <- kmeans(pca_data[, 1:2], centers = 3)  # Adjust number of clusters as needed
+
+# Ensure that the clustering results match the number of rows in merged_data
+if (nrow(merged_data) == length(kmeans_result$cluster)) {
+  merged_data$cluster <- as.factor(kmeans_result$cluster)
+} else {
+  stop("Mismatch between the number of rows in merged_data and clustering results")
+}
+
+# Visualization
+library(ggplot2)
+
+ggplot(merged_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-means Clustering with PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+# Check for missing values in merged_data
+sum(is.na(merged_data))
+
+# Investigate the cause of missing values
+which(is.na(merged_data$IsolateID))
+
+# Debug the merging process
+merged_data <- merge(pca_data, metadata, by = "IsolateID", all = TRUE)
+
+# Remove NAs and retry merging
+merged_data <- merged_data[complete.cases(merged_data), ]
+
+# Check the number of rows in merged_data again
+nrow(merged_data)
+
+# Perform K-means clustering on PCA data
+set.seed(123)  # Set seed for reproducibility
+kmeans_result <- kmeans(pca_data[, 1:2], centers = 3)  # Adjust number of clusters as needed
+
+# Ensure that the clustering results match the number of rows in merged_data
+if (nrow(merged_data) == length(kmeans_result$cluster)) {
+  merged_data$cluster <- as.factor(kmeans_result$cluster)
+} else {
+  stop("Mismatch between the number of rows in merged_data and clustering results")
+}
+
+# Visualization
+library(ggplot2)
+
+ggplot(merged_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-means Clustering with PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_# Check for missing values in merged_data
+sum(is.na(merged_data))
+
+# Investigate the cause of missing values
+which(is.na(merged_data$IsolateID))
+
+# Debug the merging process
+merged_data <- merge(pca_data, metadata, by = "IsolateID", all = TRUE)
+
+# Remove NAs and retry merging
+merged_data <- merged_data[complete.cases(merged_data), ]
+
+# Check the number of rows in merged_data again
+nrow(merged_data)
+
+# Perform K-means clustering on PCA data
+set.seed(123)  # Set seed for reproducibility
+kmeans_result <- kmeans(pca_data[, 1:2], centers = 3)  # Adjust number of clusters as needed
+
+# Ensure that the clustering results match the number of rows in merged_data
+if (nrow(merged_data) == length(kmeans_result$cluster)) {
+  merged_data$cluster <- as.factor(kmeans_result$cluster)
+} else {
+  stop("Mismatch between the number of rows in merged_data and clustering results")
+}
+
+# Visualization
+library(ggplot2)
+
+ggplot(merged_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-means Clustering with PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+
+# Debug the merging process
+merged_data <- merge(pca_data, metadata, by = "IsolateID", all = TRUE)
+
+# Remove NAs
+merged_data <- merged_data[complete.cases(merged_data), ]
+
+# Perform K-means clustering on PCA data
+set.seed(123)  # Set seed for reproducibility
+kmeans_result <- kmeans(pca_data[, 1:2], centers = 3)  # Adjust number of clusters as needed
+
+# Ensure that the clustering results match the number of rows in merged_data
+if (nrow(merged_data) == length(kmeans_result$cluster)) {
+  # Assign clustering results to merged_data
+  merged_data$cluster <- as.factor(kmeans_result$cluster)
+} else {
+  stop("Mismatch between the number of rows in merged_data and clustering results")
+}
+
+# Visualization
+library(ggplot2)
+
+ggplot(merged_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-means Clustering with PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+
+# Check the number of rows in merged_data and the length of clustering results
+nrow(merged_data)
+length(kmeans_result$cluster)
+
+# Check if there are any NA values in clustering results
+sum(is.na(kmeans_result$cluster))
+
+# Assign clustering results to merged_data
+merged_data$cluster <- as.factor(kmeans_result$cluster)
+
+# Visualization
+library(ggplot2)
+
+ggplot(merged_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 3) +
+  labs(title = "K-means Clustering with PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
+# Check the structure of pca_data and metadata
+str(pca_data)
+str(metadata)
+
+# Check if the IsolateID column exists and is correctly formatted
+# Convert the IsolateID column to character type if needed
+pca_data$IsolateID <- as.character(pca_data$IsolateID)
+metadata$IsolateID <- as.character(metadata$IsolateID)
+
+# Debug the merging process
+merged_data <- merge(pca_data, metadata, by = "IsolateID", all = TRUE)
+
+# Check the structure of merged_data and verify if the merge was successful
+str(merged_data)
+
+# If the merge was successful, proceed with the visualization
+# Otherwise, investigate the structure of pca_data and metadata to identify any issues
+
+
+# Check for discrepancies in the IsolateID column
+mismatched_ids <- setdiff(pca_data$IsolateID, metadata$IsolateID)
+mismatched_ids
+
+# If there are mismatched IDs, investigate further to understand the discrepancy
+# Check if there are leading/trailing whitespaces or other formatting issues
+
+
+# Check for any leading/trailing whitespaces or other formatting issues in IsolateID column of pca_data
+any(grepl("^\\s+|\\s+$", pca_data$IsolateID))
+
+# Check for any leading/trailing whitespaces or other formatting issues in IsolateID column of metadata
+any(grepl("^\\s+|\\s+$", metadata$IsolateID))
+
+# Remove leading/trailing whitespaces or other formatting issues if found
+pca_data$IsolateID <- trimws(pca_data$IsolateID)
+metadata$IsolateID <- trimws(metadata$IsolateID)
+
+# Debug the merging process
+merged_data <- merge(pca_data, metadata, by = "IsolateID", all = TRUE)
+
+# Check the structure of merged_data and verify if the merge was successful
+str(merged_data)
+
+
+# Print unique values of IsolateID column in pca_data
+unique(pca_data$IsolateID)
+
+# Print unique values of IsolateID column in metadata
+unique(metadata$IsolateID)
+
+
+# Debug the merging process with all.x = TRUE
+merged_data <- merge(pca_data, metadata, by = "IsolateID", all.x = TRUE)
+
+# Check the structure of merged_data and verify if the merge was successful
+str(merged_data)
+
+
+# Ensure IsolateID in pca_data matches the format of IsolateID in metadata
+pca_data$IsolateID <- paste0("ECO", sprintf("%02d", as.numeric(pca_data$IsolateID)))
+
+# Merge the datasets again with all.x = TRUE
+merged_data <- merge(pca_data, metadata, by = "IsolateID", all.x = TRUE)
+
+# Check the structure of merged_data and verify if the merge was successful
+str(merged_data)
+
+
+# Perform K-means clustering on PCA data
+set.seed(123)  # Set seed for reproducibility
+kmeans_result <- kmeans(pca_data[, c("PC1", "PC2")], centers = 1)  # Adjust number of clusters as needed
+
+# Ensure that the clustering results match the number of rows in merged_data
+if (nrow(merged_data) == length(kmeans_result$cluster)) {
+  # Assign clustering results to merged_data
+  merged_data$cluster <- as.factor(kmeans_result$cluster)
+} else {
+  stop("Mismatch between the number of rows in merged_data and clustering results")
+}
+
+# Visualization
+library(ggplot2)
+ggplot(merged_data, aes(x = PC1, y = PC2, color = cluster)) +
+  geom_point(size = 4) +
+  labs(title = "K-means Clustering with PCA",
+       x = "Principal Component 1",
+       y = "Principal Component 2") +
+  theme_minimal()
