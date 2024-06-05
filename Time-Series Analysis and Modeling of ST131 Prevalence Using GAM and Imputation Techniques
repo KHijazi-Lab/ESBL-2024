@@ -27,7 +27,7 @@ library(sjlabelled)
 library(patchwork)
 
 # Read in Metadata
-phen <- read_csv("Metadata.csv")
+phen <- read_csv("metadata.csv")
 
 # Data Preprocessing
 phen <- phen %>% 
@@ -40,40 +40,6 @@ phen <- phen %>%
 
 vars <- c("sample_no", "protect", "study_id", "st131_gp", "Sex", "setting", "hospital", "department", "ST")
 phen[vars] <- lapply(phen[vars], factor)
-
-# Create Time-Series
-# Genotype Time-Series
-p6m <- phen %>% 
-  group_by(ST, studyq) %>% 
-  summarise(n = n(), .groups = 'drop') %>% 
-  group_by(studyq) %>% 
-  mutate(sum = sum(n), .groups = 'drop')
-
-geno6m <- p6m %>% 
-  pivot_wider(id_cols = c(studyq, sum), names_from = ST, values_from = n) %>% 
-  mutate(across(everything(), ~ replace_na(.x, 0)))
-
-# Semester Time-Series
-p6m <- phen %>% 
-  group_by(st131_gp, ST, studyq) %>% 
-  summarise(n = n(), .groups = 'drop') %>% 
-  group_by(studyq) %>% 
-  mutate(sum = sum(n), pcst = n / sum, .groups = 'drop')
-
-time3m <- tibble(
-  studyq = rep(seq(1, 44, 1), 2),  
-  date = rep(seq(as.Date('2010-01-01'), length.out = 44, by = '3 months'), 2)
-)
-
-p3m <- time3m %>% 
-  mutate(month = yearmonth(date))
-
-p3m <- p3m %>% 
-  as_tsibble(index = month)
-
-# Impute missing values
-p3m <- p3m %>% 
-  mutate(imp = na_kalman(pcst, model = "auto.arima"))
 
 # Quarterly Time-Series
 p3m <- phen %>% 
@@ -95,7 +61,7 @@ time3m <- tibble(
 )
 
 p3m <- bind_cols(p3m, time3m) %>% 
-  mutate(month = yearmonth(date)) %>% 
+  mutate(month = yearquarter(date)) %>% 
   as_tsibble(index = month, key = st131_gp)
 
 # Impute missing values
@@ -140,24 +106,37 @@ fit <- fit %>%
 
 stplot1 <- ggplot(fit) +
   geom_point(aes(studyq, actual, color = "Observed"), alpha = 0.5) +
-  geom_line(aes(studyq, actual, color = "Observed"), alpha = 0.3) +
   geom_line(aes(studyq, fit, color = "Model fit")) +
   geom_ribbon(aes(studyq, ymin = lci, ymax = uci, fill = "95% CI"), alpha = 0.2) +
-  scale_color_manual(values = c("Observed" = "steelblue", "Model fit" = "orange")) +
-  scale_fill_manual(values = c("95% CI" = "orange")) +
-  scale_x_continuous("Year and quarter", breaks = seq(1, 44, 4), labels = seq(2010, 2020, 1)) +
-  scale_y_continuous("% ST-131", limits = c(0, 1.06), labels = scales::percent_format(accuracy = 1)) +
-  theme(legend.title = element_blank())
+  scale_color_manual(values = c("Observed" = "blue4", "Model fit" = "blue4")) +
+  scale_fill_manual(values = c("95% CI" = "blue4")) +
+  scale_x_continuous("Year and Quarter", breaks = seq(1, 44, 4), labels = seq(2010, 2020, 1)) +
+  scale_y_continuous("% ST131", limits = c(0, 1.06), labels = scales::percent_format(accuracy = 1)) +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
 
-stplot1
+print(stplot1)
 
-# Plot of First Derivatives
 d <- gratia::derivatives(st3ma, order = 1, n = 132)
-dplot1 <- ggplot(d, aes(data, derivatives)) + 
-  geom_line(color = "steelblue") +
-  geom_ribbon(aes(data, ymin = lower, ymax = upper), fill = "steelblue", alpha = 0.1) +
-  scale_y_continuous("Change in %ST-131") +
-  scale_x_continuous("Year and quarter", breaks = seq(1, 44, 4), labels = seq(2010, 2020, 1)) +
-  geom_hline(aes(yintercept = 0), linetype = "dashed", color = "grey")
+print(names(d))
 
-dplot1
+
+dplot1 <- ggplot(d, aes(x = studyq, y = .derivative)) + 
+  geom_line(color = "blue4") +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), fill = "blue4", alpha = 0.1) +
+  scale_y_continuous("Change in %ST131") +
+  scale_x_continuous("Year and Quarter", breaks = seq(1, 44, 4), labels = seq(2010, 2020, 1)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(dplot1)
+
+
+# Ensure the patchwork package is installed and loaded
+install.packages("patchwork")  # Run this line if you don't have patchwork installed
+library(patchwork)
+
+# Combine the plots side by side using patchwork
+combined_plot <- stplot1 + dplot1
+
+# Print the combined plot
+print(combined_plot)
