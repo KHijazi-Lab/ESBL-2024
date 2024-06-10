@@ -109,3 +109,5 @@ combined_plot <- fit_plot + derivatives_plot
 
 # Print the combined plot
 print(combined_plot)
+
+cat("\nNote: Special thanks to Timothy Lawes from University fo Aberdeen for his contributions and guidance in this analysis.\n")
