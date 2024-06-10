@@ -1,142 +1,113 @@
-# Load General Packages
-library(tidyverse)     # to enable tidyverse functions  
-library(lmtest)        # comparing models
-library(stats)         # useful general functions
-library(devtools)
-library(data.table)
-library(dplyr)
-
-# Load Time-Series Packages
-library(fpp3)          # enables tsibble, and fable packages
-library(forecast)      # for forecasting
-library(tseries)       # for working with time-series data
-library(strucchange)   # for detecting structural changes in time-series
-library(imputeTS)      # for imputing missing values in time-series
-
-# Load Time-Series Model Packages
-library(mgcv)          # Frequentist GAM models
-library(brms)          # Bayesian GAM models
-library(bayesdfa)      # Bayesian Dynamic Factor Models
-library(dlnm)          # Distributed lag GAM models
-library(gratia)
-library(prophet)
-
-# Load Miscellaneous Packages
-library(AMR)
-library(sjlabelled)
-library(patchwork)
+# Load Required Packages
+library(tidyverse)  
+library(fpp3)  
+library(forecast)  
+library(imputeTS)  
+library(mgcv)  
+library(gratia)  
 
 # Read in Metadata
-phen <- read_csv("metadata.csv")
+metadata <- read_csv("metadata.csv")
 
 # Data Preprocessing
-phen <- phen %>% 
-  mutate(org = as.mo(org), 
-         studys = ceiling(studyq / 2))
-
-phen <- phen %>% 
+metadata <- metadata %>% 
   mutate(org = as.mo(Org), 
          studys = ceiling(studyq / 2))
 
-vars <- c("sample_no", "protect", "study_id", "st131_gp", "Sex", "setting", "hospital", "department", "ST")
-phen[vars] <- lapply(phen[vars], factor)
+factor_vars <- c("sample_no", "protect", "study_id", "st131_gp", "Sex", "setting", "hospital", "department", "ST")
+metadata[factor_vars] <- lapply(metadata[factor_vars], factor)
 
 # Quarterly Time-Series
-p3m <- phen %>% 
+processed_data <- metadata %>% 
   group_by(st131_gp, studyq) %>% 
   summarise(n = n(), .groups = 'drop') %>% 
   group_by(studyq) %>% 
   mutate(sum = sum(n), pc131 = n / sum, .groups = 'drop')
 
-time3m <- expand_grid(
+expanded_grid <- expand_grid(
   studyq = seq(1, 44, 1),
   st131_gp = factor(c("0", "1"))
 )
 
-p3m <- time3m %>% 
-  left_join(p3m, by = c("studyq", "st131_gp"))
+processed_data <- expanded_grid %>% 
+  left_join(processed_data, by = c("studyq", "st131_gp"))
 
-time3m <- tibble(
+date_grid <- tibble(
   date = rep(seq(as.Date('2010-01-01'), length.out = 44, by = '3 months'), 2)
 )
 
-p3m <- bind_cols(p3m, time3m) %>% 
+processed_data <- bind_cols(processed_data, date_grid) %>% 
   mutate(month = yearquarter(date)) %>% 
   as_tsibble(index = month, key = st131_gp)
 
 # Impute missing values
-p3m <- p3m %>% 
+processed_data <- processed_data %>% 
   mutate(imp = na_kalman(pc131, model = "auto.arima"))
 
-# Fit GAM Models
-# Quarterly Time-Series Analysis
+# Fit GAM Model
+filtered_data <- processed_data %>% filter(st131_gp == "1")
 
-# Limit data to model ST131 as % total
-p3m_st <- p3m %>% filter(st131_gp == "1")
-
-# Model A: % ST131
-st3ma <- mgcv::gam(
+gam_model <- mgcv::gam(
   formula = pc131 ~ 1 + s(studyq, bs = "tp", k = 30, m = 3),
   family = binomial(link = "logit"),
   weight = sum,
-  data = p3m_st
+  data = filtered_data
 )
 
-# Model diagnostics and plotting
-summary(st3ma)
-k.check(st3ma)
-gratia::appraise(st3ma)
-BIC(st3ma)
-acf(st3ma$residuals)
+# Model Diagnostics and Plotting
+summary(gam_model)
+k.check(gam_model)
+gratia::appraise(gam_model)
+BIC(gam_model)
+acf(gam_model$residuals)
 
 # Plot Model Fit
-gratia::draw(st3ma, fun = plogis, parametric = TRUE, ci_col = "steelblue", smooth_col = "steelblue", ncol = 3, nrow = 1, guides = "keep") +
+gratia::draw(gam_model, fun = plogis, parametric = TRUE, ci_col = "grey4", smooth_col = "grey4", ncol = 3, nrow = 1, guides = "keep") +
   scale_y_continuous(limits = c(0, 1))
 
 # Plot of Best Model vs. Observed
-newdat <- p3m_st %>% select(studyq, st131_gp)
-fit <- predict(st3ma, newdata = newdat, type = "response", se.fit = TRUE) %>% as_tibble()
+newdat <- filtered_data %>% select(studyq, st131_gp)
+fit <- predict(gam_model, newdata = newdat, type = "response", se.fit = TRUE) %>% as_tibble()
 fit <- fit %>%
   mutate(
-    actual = p3m_st$pc131,
-    studyq = p3m_st$studyq,
+    actual = filtered_data$pc131,
+    studyq = filtered_data$studyq,
     lci = fit - (2 * se.fit),
     uci = fit + (2 * se.fit)
   )
 
-stplot1 <- ggplot(fit) +
+fit_plot <- ggplot(fit) +
   geom_point(aes(studyq, actual, color = "Observed"), alpha = 0.5) +
   geom_line(aes(studyq, fit, color = "Model fit")) +
   geom_ribbon(aes(studyq, ymin = lci, ymax = uci, fill = "95% CI"), alpha = 0.2) +
-  scale_color_manual(values = c("Observed" = "blue4", "Model fit" = "blue4")) +
-  scale_fill_manual(values = c("95% CI" = "blue4")) +
+  scale_color_manual(values = c("Observed" = "grey4", "Model fit" = "grey4")) +
+  scale_fill_manual(values = c("95% CI" = "grey4")) +
   scale_x_continuous("Year and Quarter", breaks = seq(1, 44, 4), labels = seq(2010, 2020, 1)) +
   scale_y_continuous("% ST131", limits = c(0, 1.06), labels = scales::percent_format(accuracy = 1)) +
   theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
 
-print(stplot1)
+print(fit_plot)
 
-d <- gratia::derivatives(st3ma, order = 1, n = 132)
-print(names(d))
+derivatives_data <- gratia::derivatives(gam_model, order = 1, n = 132)
 
-
-dplot1 <- ggplot(d, aes(x = studyq, y = .derivative)) + 
-  geom_line(color = "blue4") +
-  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), fill = "blue4", alpha = 0.1) +
+derivatives_plot <- ggplot(derivatives_data, aes(x = studyq, y = .derivative)) + 
+  geom_line(color = "grey4") +
+  geom_ribbon(aes(ymin = .lower_ci, ymax = .upper_ci), fill = "grey4", alpha = 0.1) +
   scale_y_continuous("Change in %ST131") +
   scale_x_continuous("Year and Quarter", breaks = seq(1, 44, 4), labels = seq(2010, 2020, 1)) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "grey") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-print(dplot1)
-
+print(derivatives_plot)
 
 # Ensure the patchwork package is installed and loaded
 install.packages("patchwork")  # Run this line if you don't have patchwork installed
 library(patchwork)
 
 # Combine the plots side by side using patchwork
-combined_plot <- stplot1 + dplot1
+combined_plot <- fit_plot + derivatives_plot
 
 # Print the combined plot
 print(combined_plot)
+
+cat("\nNote: Special thanks to Timothy Lawes from University fo Aberdeen for his contributions and guidance in this analysis.\n")
